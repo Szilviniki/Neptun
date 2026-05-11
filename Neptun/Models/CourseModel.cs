@@ -35,4 +35,6 @@ public class CourseModel
 
     public List<UserModel> Teachers { get; set; } = new();
     public List<UserModel> Students { get; set; } = new();
+    public List<ScheduleModel> Schedules { get; set; } = new();
+
 }

@@ -1,59 +1,63 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Neptun.Data;
+using Neptun.Data; 
 using Neptun.Models;
-using BCrypt.Net;
+using Neptun.DTOs;
+using System;
 
 namespace Neptun.Services;
 
 public class UserService(ApplicationDbContext context)
 {
-    private readonly ApplicationDbContext _context = context;
-
-
-    public async Task<UserModel?> GetUserByIdAsync(Guid userId)
+    public async Task<UserModel?> GetUserByIdAsync(Guid id)
     {
-        return await _context.Users.FindAsync(userId);
+        return await context.Users.FindAsync(id);
     }
 
-    public async Task<UserModel?> RegisterUserAsync(UserModel user)
+    public async Task<UserModel?> RegisterUserAsync(UserRegisterDto dto)
     {
-        if (await _context.Users.AnyAsync(u => u.Email == user.Email))
+        if (await context.Users.AnyAsync(u => u.Email == dto.Email))
             return null;
 
-        user.Id = Guid.NewGuid();
-        user.IsActive = true;
+        var user = new UserModel
+        {
+            Id = Guid.NewGuid(),
+            Username = dto.Username,
+            Email = dto.Email,
+            Password = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+            Type = dto.Type,
+            Mode = dto.Mode,
+            IsActive = true
+        };
 
-        user.Password = BCrypt.Net.BCrypt.HashPassword(user.Password);
-
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync();
-        return user;
-
-    }
-    public async Task<UserModel?> UpdateUserAsync(Guid userId, UserModel updatedData)
-    {
-        var user = await _context.Users.FindAsync(userId);
-        if (user == null) return null;
-
-        user.Username = updatedData.Username;
-        user.Email = updatedData.Email;
-
-        if (!string.IsNullOrEmpty(updatedData.Password))
-            user.Password = BCrypt.Net.BCrypt.HashPassword(updatedData.Password);
-
-        user.Mode = updatedData.Mode;
-
-        await _context.SaveChangesAsync();
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
         return user;
     }
 
-    public async Task<bool> SetUserStatusAsync(Guid userId, bool status)
+    public async Task<UserModel?> UpdateUserAsync(Guid userId, UserUpdateDto dto)
     {
-        var user = await _context.Users.FindAsync(userId);
+        var user = await context.Users.FindAsync(userId);
+
+        if (user == null || !user.IsActive) return null;
+
+        user.Username = dto.Username;
+        user.Email = dto.Email;
+
+        if (!string.IsNullOrEmpty(dto.Password))
+            user.Password = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+
+
+        await context.SaveChangesAsync();
+        return user;
+    }
+
+    public async Task<bool> SetUserStatusAsync(Guid id, bool active)
+    {
+        var user = await context.Users.FindAsync(id);
         if (user == null) return false;
 
-        user.IsActive = status;
-        await _context.SaveChangesAsync();
+        user.IsActive = active;
+        await context.SaveChangesAsync();
         return true;
     }
 }

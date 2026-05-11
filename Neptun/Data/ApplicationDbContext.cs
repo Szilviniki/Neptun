@@ -10,6 +10,8 @@ namespace Neptun.Data
         public DbSet<UserModel> Users { get; set; }
         public DbSet<SubjectModel> Subjects { get; set; }
         public DbSet<CourseModel> Courses { get; set; }
+        public DbSet<ScheduleModel> Schedules { get; set; }
+        public DbSet<NotificationLogModel> NotificationLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -29,7 +31,14 @@ namespace Neptun.Data
             modelBuilder.Entity<CourseModel>()
                 .HasMany(c => c.Students)
                 .WithMany()
-                .UsingEntity(j => j.ToTable("course_students")); 
+                .UsingEntity(j => j.ToTable("course_students"));
+         
+            modelBuilder.Entity<ScheduleModel>()
+                .HasOne(s => s.Course)
+                .WithMany()
+                .HasForeignKey(s => s.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
         }
     }
 }

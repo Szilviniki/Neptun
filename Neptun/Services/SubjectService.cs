@@ -1,49 +1,56 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Neptun.Data;
 using Neptun.Models;
+using Neptun.Services;
+using Neptun.DTOs;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Neptun.Services;
 
 public class SubjectService(ApplicationDbContext context)
 {
-    private readonly ApplicationDbContext _context = context;
-
     public async Task<List<SubjectModel>> GetAllSubjectsAsync()
-        => await _context.Users.IgnoreQueryFilters().Cast<SubjectModel>().ToListAsync(); 
+        => await context.Subjects.ToListAsync();
 
     public async Task<SubjectModel?> GetSubjectByIdAsync(Guid subjectId)
-        => await _context.Subjects.FindAsync(subjectId);
+        => await context.Subjects.FindAsync(subjectId);
 
-    public async Task<SubjectModel> CreateSubjectAsync(SubjectModel subject)
+    public async Task<SubjectModel> CreateSubjectAsync(SubjectCreateDto dto)
     {
-        subject.Id = Guid.NewGuid();
-        subject.IsActive = true;     
+        var subject = new SubjectModel
+        {
+            Id = Guid.NewGuid(),
+            Code = dto.Code,
+            Name = dto.Name,
+            Credits = dto.Credits,
+            IsActive = true 
+        };
 
-        _context.Subjects.Add(subject);
-        await _context.SaveChangesAsync();
+        context.Subjects.Add(subject);
+        await context.SaveChangesAsync();
         return subject;
     }
 
-    public async Task<SubjectModel?> UpdateSubjectAsync(Guid subjectId, SubjectModel updatedData)
+    public async Task<SubjectModel?> UpdateSubjectAsync(Guid subjectId, SubjectUpdateDto dto)
     {
-        var subject = await _context.Subjects.FindAsync(subjectId);
+        var subject = await context.Subjects.FindAsync(subjectId);
         if (subject == null) return null;
 
-        subject.Code = updatedData.Code;
-        subject.Name = updatedData.Name;
-        subject.Credits = updatedData.Credits;
+        subject.Name = dto.Name;
+        subject.Credits = dto.Credits;
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return subject;
     }
 
     public async Task<bool> SetSubjectStatusAsync(Guid subjectId, bool status)
     {
-        var subject = await _context.Subjects.FindAsync(subjectId);
+        var subject = await context.Subjects.FindAsync(subjectId);
         if (subject == null) return false;
 
         subject.IsActive = status;
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return true;
     }
+  
 }

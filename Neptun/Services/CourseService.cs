@@ -1,68 +1,89 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Neptun.Data;
 using Neptun.Models;
+using Neptun.DTOs;
+using Neptun.Migrations;
 
 namespace Neptun.Services;
 
 public class CourseService(ApplicationDbContext context)
 {
-    private readonly ApplicationDbContext _context = context;
 
     public async Task<CourseModel?> GetCourseByIdAsync(Guid courseId)
     {
-        return await _context.Courses
+        return await context.Courses
             .Include(c => c.Subject)
             .Include(c => c.Teachers)
+            .Include(c => c.Students)
             .FirstOrDefaultAsync(c => c.Id == courseId);
     }
 
-    public async Task<CourseModel?> CreateCourseAsync(CourseModel course, List<Guid> teacherIds)
+    public async Task<List<CourseModel>> GetAllCoursesAsync()
     {
-        var subject = await _context.Subjects.FindAsync(course.SubjectId);
-        if (subject == null || !subject.IsActive) return null;
+        return await context.Courses
+            .Include(c => c.Subject)
+            .ToListAsync();
+    }
 
-        var teachers = await _context.Users
-            .Where(u => teacherIds.Contains(u.Id) && u.Type == UserType.Teacher)
+    public async Task<CourseModel?> CreateCourseAsync(CourseCreateDto dto)
+    {
+        var subject = await context.Subjects
+            .FirstOrDefaultAsync(s => s.Code == dto.SubjectCode);
+
+        if (subject == null || !subject.IsActive)
+            return null;
+
+        var teachers = await context.Users
+            .Where(u => dto.TeacherIds.Contains(u.Id) && u.Type == UserType.Teacher)
             .ToListAsync();
 
-        course.Id = Guid.NewGuid();
-        course.Teachers = teachers;
+        if (teachers.Count != dto.TeacherIds.Count)
+            return null;
 
-        _context.Courses.Add(course);
-        await _context.SaveChangesAsync();
+        var course = new CourseModel
+        {
+            Id = Guid.NewGuid(),
+            CourseCode = dto.CourseCode,
+            SubjectId = subject.Id,
+            Semester = dto.Semester,
+            MaxStudents = dto.MaxStudents,
+            Type = dto.Type,
+            Form = dto.Form,
+            Hours = dto.Hours,
+            Teachers = teachers
+        };
+
+        context.Courses.Add(course);
+        await context.SaveChangesAsync();
         return course;
     }
 
-    public async Task<CourseModel?> UpdateCourseAsync(Guid courseId, CourseModel updatedData)
+    public async Task<CourseModel?> UpdateCourseAsync(Guid courseId, CourseUpdateDto dto)
     {
-        var course = await _context.Courses.FindAsync(courseId);
+        var course = await context.Courses.FindAsync(courseId);
         if (course == null) return null;
 
-        course.CourseCode = updatedData.CourseCode;
-        course.Semester = updatedData.Semester;
-        course.MaxStudents = updatedData.MaxStudents;
-        course.Type = updatedData.Type;
-        course.Form = updatedData.Form;
-        course.Hours = updatedData.Hours;
+        course.Semester = dto.Semester;
+        course.MaxStudents = dto.MaxStudents;
+        course.Hours = dto.Hours;
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return course;
     }
 
-    public async Task<string?> DeleteCourseAsync(Guid courseId)
+    public async Task<bool> DeleteCourseAsync(Guid courseId)
     {
-
-        var course = await _context.Courses
+        var course = await context.Courses
             .Include(c => c.Students)
             .FirstOrDefaultAsync(c => c.Id == courseId);
 
-        if (course == null) return "Kurzus nem található.";
+        if (course == null) return false;
 
-        if (course.Students.Any())
-            return "A kurzus nem törölhető, mert vannak rajta hallgatók!";
+        if (course.Students.Count > 0)
+            return false;
 
-        _context.Courses.Remove(course);
-        await _context.SaveChangesAsync();
-        return null;
+        context.Courses.Remove(course);
+        await context.SaveChangesAsync();
+        return true;
     }
 }
